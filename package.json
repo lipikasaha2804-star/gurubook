@@ -1,0 +1,8 @@
+{
+  "name": "gurubook",
+  "version": "1.0.0",
+  "dependencies": {
+    "razorpay": "^2.9.2",
+    "firebase-admin": "^12.1.0"
+  }
+}
