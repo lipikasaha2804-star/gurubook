@@ -1,17 +1,11 @@
 /**
  * Netlify Function — check-payment-status.js
+ * HARDENED VERSION: Uses phone number from order notes (consistent
+ * with verify-payment.js). Fixes the deviceId bug. Adds idempotency
+ * and paidUntil extension.
  *
- * Called when the user returns to the app after a UPI payment
- * (e.g. after GPay closes). Checks Razorpay to see if the
- * payment for a given order was completed, and if so, writes
- * paidUntil to Firestore just like verify-payment.js does.
- *
- * Required env vars (same as verify-payment.js):
- *   RAZORPAY_KEY_ID
- *   RAZORPAY_KEY_SECRET
- *   FIREBASE_PROJECT_ID
- *   FIREBASE_CLIENT_EMAIL
- *   FIREBASE_PRIVATE_KEY
+ * Called by pay.html when user returns from UPI app.
+ * Accepts: { orderId: "order_..." }
  */
 
 const Razorpay = require('razorpay');
@@ -44,10 +38,10 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
-  const { orderId, deviceId } = body;
+  const { orderId } = body;
 
-  if (!orderId || !deviceId) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'orderId and deviceId required' }) };
+  if (!orderId) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'orderId is required' }) };
   }
 
   const razorpay = new Razorpay({
@@ -56,14 +50,23 @@ exports.handler = async (event) => {
   });
 
   try {
-    // Fetch all payments for this order from Razorpay
-    const payments = await razorpay.orders.fetchPayments(orderId);
+    // ── 1. Fetch order to get phone & plan from notes ─────────────────────
+    const order = await razorpay.orders.fetch(orderId);
+    const plan  = order.notes?.plan  || 'monthly';
+    const phone = order.notes?.phone || '';
 
-    // Find a captured (successful) payment
+    if (!phone) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Phone not in order notes — cannot activate' })
+      };
+    }
+
+    // ── 2. Check if any payment was captured for this order ───────────────
+    const payments = await razorpay.orders.fetchPayments(orderId);
     const successfulPayment = payments.items?.find(p => p.status === 'captured');
 
     if (!successfulPayment) {
-      // Payment not done yet — user may have cancelled or it's still pending
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -71,17 +74,54 @@ exports.handler = async (event) => {
       };
     }
 
-    // Determine plan from order notes
-    const order   = await razorpay.orders.fetch(orderId);
-    const plan    = order.notes?.plan || 'monthly';
-    const duration = PLAN_DURATION_MS[plan] || PLAN_DURATION_MS.monthly;
+    // ── 3. Look up user by phone (same as verify-payment.js) ─────────────
+    const db         = admin.firestore();
+    const normalised = phone.replace(/\D/g, '').slice(-10);
 
-    const now      = new Date();
-    const paidUntil = new Date(now.getTime() + duration);
+    let snap = await db.collection('users')
+      .where('phoneNumber', '==', normalised)
+      .limit(1).get();
 
-    // Write to Firestore
-    const db = admin.firestore();
-    await db.collection('users').doc(deviceId).update({
+    if (snap.empty) {
+      snap = await db.collection('users')
+        .where('phoneNumber', '==', '91' + normalised)
+        .limit(1).get();
+    }
+
+    if (snap.empty) {
+      console.error('UPI-return: User not found for phone:', normalised);
+      return {
+        statusCode: 404,
+        body: JSON.stringify({ error: 'User not found. Please open the GuruBook app first.' })
+      };
+    }
+
+    const userDocRef = snap.docs[0].ref;
+
+    // ── 4. Idempotency check ──────────────────────────────────────────────
+    const userDoc  = await userDocRef.get();
+    const userData = userDoc.data() || {};
+
+    if (userData.lastPaymentId === successfulPayment.id) {
+      console.log(`UPI-return: Payment ${successfulPayment.id} already processed`);
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paid:      true,
+          paidUntil: userData.paidUntil?.toDate().toISOString()
+        })
+      };
+    }
+
+    // ── 5. Activate: extend from current expiry ───────────────────────────
+    const duration     = PLAN_DURATION_MS[plan] || PLAN_DURATION_MS.monthly;
+    const now          = new Date();
+    const currentPaidUntil = userData.paidUntil?.toDate();
+    const baseDate     = (currentPaidUntil && currentPaidUntil > now) ? currentPaidUntil : now;
+    const paidUntil    = new Date(baseDate.getTime() + duration);
+
+    await userDocRef.update({
       paidUntil:       admin.firestore.Timestamp.fromDate(paidUntil),
       status:          'paid',
       lastPaymentId:   successfulPayment.id,
@@ -89,7 +129,7 @@ exports.handler = async (event) => {
       lastPaymentAt:   admin.firestore.FieldValue.serverTimestamp()
     });
 
-    console.log(`UPI return: Activated ${plan} for device ${deviceId} until ${paidUntil.toISOString()}`);
+    console.log(`UPI-return: Activated ${plan} for ${normalised} until ${paidUntil.toISOString()}`);
 
     return {
       statusCode: 200,
