@@ -104,9 +104,18 @@
   .state-msg { font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.7; }
   .return-btn {
     margin-top: 24px; width: 100%; padding: 15px;
-    background: linear-gradient(135deg, #25d366, #128c7e);
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: #fff; border: none; border-radius: 16px;
     font-size: 15px; font-weight: 800; cursor: pointer;
+    font-family: inherit; display: flex; align-items: center;
+    justify-content: center; gap: 8px;
+    text-decoration: none;
+  }
+  .whatsapp-btn {
+    margin-top: 10px; width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    color: #fff; border: none; border-radius: 16px;
+    font-size: 14px; font-weight: 800; cursor: pointer;
     font-family: inherit; display: flex; align-items: center;
     justify-content: center; gap: 8px;
   }
@@ -126,7 +135,7 @@
   <div id="state-select" class="state active">
     <div class="logo">📚</div>
     <div class="brand">GuruBook</div>
-    <div class="tagline">Fee & Student Management for Teachers</div>
+    <div class="tagline">Fee &amp; Student Management for Teachers</div>
 
     <!-- Features -->
     <div class="features">
@@ -192,8 +201,10 @@
     <div class="state-title">You're All Set!</div>
     <div class="state-msg">
       Your GuruBook subscription is now <strong style="color:#a5b4fc;">active</strong>.<br><br>
-      Return to the app — it will unlock automatically. If it doesn't, tap the button below.
+      Tap the button below to return to the app.<br>
+      <span style="font-size:12px;opacity:0.5;">(your subscription is already unlocked)</span>
     </div>
+    <!-- Deep link button — opens gurubook:// which Median intercepts and brings app to foreground -->
     <button class="return-btn" onclick="returnToApp()">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
       Return to GuruBook App
@@ -209,7 +220,7 @@
     </div>
     <div id="error-ref"></div>
     <button class="error-btn" onclick="showState('state-select')">← Try Again</button>
-    <button class="return-btn" onclick="contactSupport()" style="margin-top:10px;">
+    <button class="whatsapp-btn" onclick="contactSupport()">
       💬 Contact Support on WhatsApp
     </button>
   </div>
@@ -219,9 +230,15 @@
 <script>
 // ── Read URL params ───────────────────────────────────────────────────────────
 const params  = new URLSearchParams(window.location.search);
-const phone   = params.get('phone') || '';
+const phone   = params.get('phone')  || '';
 const source  = params.get('source') || 'web';
-let   plan    = params.get('plan')  || 'yearly';
+let   plan    = params.get('plan')   || 'yearly';
+
+// ── Deep link scheme for your Median app ─────────────────────────────────────
+// This is the custom URL scheme registered in your Median (GoNative) app config.
+// When opened from Chrome, Android/iOS will switch focus back to GuruBook.
+// Make sure this matches the scheme in your Median dashboard → App Settings → Deep Links.
+const APP_DEEP_LINK = 'gurubook://payment-success';
 
 // ── Init plan selection ───────────────────────────────────────────────────────
 if (plan === 'monthly') selectPlan('monthly');
@@ -261,29 +278,18 @@ async function startPayment() {
     btn.disabled = false;
     btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
 
-    // Save order to sessionStorage so we can recover if Chrome reloads after UPI return
-    sessionStorage.setItem('gb_pending_order', JSON.stringify({
-      orderId: order.orderId,
-      phone,
-      plan
-    }));
-
     // 2. Open Razorpay checkout
+    //    Running in external Chrome — UPI deep links (GPay, PhonePe, etc.) work correctly here.
     const rzp = new window.Razorpay({
-      key:      order.keyId,
-      amount:   order.amount,
-      currency: 'INR',
-      name:     'GuruBook',
+      key:         order.keyId,
+      amount:      order.amount,
+      currency:    'INR',
+      name:        'GuruBook',
       description: plan === 'yearly' ? 'Yearly Plan — ₹1,980/year' : 'Monthly Plan — ₹349/month',
-      order_id: order.orderId,
-      prefill:  { contact: phone },
-      readonly: { contact: true },
-      theme:    { color: '#6366f1' },
-      config: {
-        display: {
-          preferences: { show_default_blocks: true }
-        }
-      },
+      order_id:    order.orderId,
+      prefill:     { contact: phone },
+      readonly:    { contact: true },
+      theme:       { color: '#6366f1' },
       modal: {
         ondismiss: () => {
           btn.disabled = false;
@@ -307,9 +313,10 @@ async function startPayment() {
           });
           const vData = await vRes.json();
           if (vData.success) {
-            sessionStorage.removeItem('gb_pending_order');
             showState('state-success');
-            setTimeout(returnToApp, 3000);
+            // Auto-attempt deep link after 2s. The Firestore onSnapshot in the app
+            // will have already unlocked the subscription by the time user returns.
+            setTimeout(returnToApp, 2000);
           } else {
             throw new Error(vData.error || 'Verification failed');
           }
@@ -337,49 +344,14 @@ async function startPayment() {
   }
 }
 
-// ── Return to app ─────────────────────────────────────────────────────────────
+// ── Return to app via deep link ───────────────────────────────────────────────
+// Since pay.html opens in EXTERNAL Chrome (not Median's in-app browser),
+// window.close() / history.back() won't work. Instead we navigate to the
+// app's custom URL scheme, which Android/iOS intercepts and brings GuruBook
+// back to the foreground.
 function returnToApp() {
-  try { window.close(); } catch(e) {}
-  setTimeout(() => { try { history.back(); } catch(e) {} }, 400);
+  window.location.href = APP_DEEP_LINK;
 }
-
-// ── Recovery: runs on every page load ────────────────────────────────────────
-// When Chrome reloads after UPI return, the Razorpay handler never fires.
-// We detect this by checking sessionStorage for a pending order and polling
-// check-payment-status to see if it was captured.
-async function _recoverAfterUPIReturn() {
-  const raw = sessionStorage.getItem('gb_pending_order');
-  if (!raw) return;
-  let pending;
-  try { pending = JSON.parse(raw); } catch { return; }
-  if (!pending.orderId || !pending.phone) return;
-
-  // Show processing state immediately — payment likely already done
-  showState('state-processing');
-
-  try {
-    const res = await fetch('/.netlify/functions/check-payment-status', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ orderId: pending.orderId, phone: pending.phone })
-    });
-    const data = await res.json();
-    if (data.paid) {
-      sessionStorage.removeItem('gb_pending_order');
-      showState('state-success');
-      setTimeout(returnToApp, 3000);
-    } else {
-      // Payment not captured yet — go back to select so user can retry
-      sessionStorage.removeItem('gb_pending_order');
-      showState('state-select');
-    }
-  } catch(e) {
-    sessionStorage.removeItem('gb_pending_order');
-    showState('state-select');
-  }
-}
-
-window.addEventListener('DOMContentLoaded', _recoverAfterUPIReturn);
 
 function contactSupport() {
   const msg = encodeURIComponent(
