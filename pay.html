@@ -192,7 +192,8 @@
     <div class="state-title">You're All Set!</div>
     <div class="state-msg">
       Your GuruBook subscription is now <strong style="color:#a5b4fc;">active</strong>.<br><br>
-      Return to the app — it will unlock automatically. If it doesn't, tap the button below.
+      Returning you to the app automatically…<br>
+      <span style="font-size:12px;opacity:0.5;">(or tap below if it doesn't happen)</span>
     </div>
     <button class="return-btn" onclick="returnToApp()">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -217,36 +218,6 @@
 </div>
 
 <script>
-// ── Webview detection: force open in Chrome if running inside Median/webview ──
-(function() {
-  const ua = navigator.userAgent || '';
-  const isWebView = (
-    // Android WebView signals
-    /wv/.test(ua) ||
-    /Version\/[\d.]+.*Chrome\/[\d.]+ Mobile/.test(ua) === false && /Android/.test(ua) && /Chrome/.test(ua) === false ||
-    // Median/GoNative specific
-    /gonative/i.test(ua) ||
-    /median/i.test(ua) ||
-    // Generic webview check
-    (typeof window.median !== 'undefined') ||
-    (typeof window.gonative !== 'undefined')
-  );
-
-  if (isWebView) {
-    // Build intent URL to force open in Chrome on Android
-    const currentUrl = window.location.href;
-    const intentUrl  = 'intent://' + currentUrl.replace(/^https?:\/\//, '') +
-                       '#Intent;scheme=https;package=com.android.chrome;end';
-    window.location.href = intentUrl;
-
-    // Fallback: try _system or _blank in case intent fails
-    setTimeout(function() {
-      window.open(currentUrl, '_system') || window.open(currentUrl, '_blank');
-    }, 300);
-    return; // stop rest of script from running
-  }
-})();
-
 // ── Read URL params ───────────────────────────────────────────────────────────
 const params  = new URLSearchParams(window.location.search);
 const phone   = params.get('phone') || '';
@@ -304,24 +275,7 @@ async function startPayment() {
       theme:    { color: '#6366f1' },
       config: {
         display: {
-          blocks: {
-            upi: {
-              name: 'Pay via UPI',
-              instruments: [
-                { method: 'upi', flows: ['collect', 'intent', 'qr'] }
-              ]
-            },
-            other: {
-              name: 'Other Payment Methods',
-              instruments: [
-                { method: 'card' },
-                { method: 'netbanking' },
-                { method: 'wallet' }
-              ]
-            }
-          },
-          sequence: ['block.upi', 'block.other'],
-          preferences: { show_default_blocks: false }
+          preferences: { show_default_blocks: true }
         }
       },
       modal: {
@@ -348,6 +302,9 @@ async function startPayment() {
           const vData = await vRes.json();
           if (vData.success) {
             showState('state-success');
+            // Auto-close this tab after 3 s so the user lands back in the app.
+            // The app's Firestore onSnapshot listener will have already unlocked it.
+            setTimeout(returnToApp, 3000);
           } else {
             throw new Error(vData.error || 'Verification failed');
           }
@@ -377,12 +334,12 @@ async function startPayment() {
 
 // ── Return to app ─────────────────────────────────────────────────────────────
 function returnToApp() {
-  // Try the custom URL scheme first (if Median has it configured)
-  window.location.href = 'gurubook://unlock';
-  // Fallback after 1s: just tell the user to switch back
-  setTimeout(() => {
-    alert('Please switch back to the GuruBook app — it should be unlocked now!');
-  }, 1000);
+  // pay.html opens in Median's in-app browser (App Browser mode in Link Handling).
+  // window.close() closes the in-app browser overlay and drops the user
+  // straight back into the app — the Firestore listener will have already unlocked it.
+  try { window.close(); } catch(e) {}
+  // Fallback: history.back() also dismisses the Median in-app browser overlay.
+  setTimeout(() => { try { history.back(); } catch(e) {} }, 400);
 }
 
 function contactSupport() {
