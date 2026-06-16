@@ -217,6 +217,36 @@
 </div>
 
 <script>
+// ── Webview detection: force open in Chrome if running inside Median/webview ──
+(function() {
+  const ua = navigator.userAgent || '';
+  const isWebView = (
+    // Android WebView signals
+    /wv/.test(ua) ||
+    /Version\/[\d.]+.*Chrome\/[\d.]+ Mobile/.test(ua) === false && /Android/.test(ua) && /Chrome/.test(ua) === false ||
+    // Median/GoNative specific
+    /gonative/i.test(ua) ||
+    /median/i.test(ua) ||
+    // Generic webview check
+    (typeof window.median !== 'undefined') ||
+    (typeof window.gonative !== 'undefined')
+  );
+
+  if (isWebView) {
+    // Build intent URL to force open in Chrome on Android
+    const currentUrl = window.location.href;
+    const intentUrl  = 'intent://' + currentUrl.replace(/^https?:\/\//, '') +
+                       '#Intent;scheme=https;package=com.android.chrome;end';
+    window.location.href = intentUrl;
+
+    // Fallback: try _system or _blank in case intent fails
+    setTimeout(function() {
+      window.open(currentUrl, '_system') || window.open(currentUrl, '_blank');
+    }, 300);
+    return; // stop rest of script from running
+  }
+})();
+
 // ── Read URL params ───────────────────────────────────────────────────────────
 const params  = new URLSearchParams(window.location.search);
 const phone   = params.get('phone') || '';
@@ -274,7 +304,24 @@ async function startPayment() {
       theme:    { color: '#6366f1' },
       config: {
         display: {
-          preferences: { show_default_blocks: true }
+          blocks: {
+            upi: {
+              name: 'Pay via UPI',
+              instruments: [
+                { method: 'upi', flows: ['collect', 'intent', 'qr'] }
+              ]
+            },
+            other: {
+              name: 'Other Payment Methods',
+              instruments: [
+                { method: 'card' },
+                { method: 'netbanking' },
+                { method: 'wallet' }
+              ]
+            }
+          },
+          sequence: ['block.upi', 'block.other'],
+          preferences: { show_default_blocks: false }
         }
       },
       modal: {
