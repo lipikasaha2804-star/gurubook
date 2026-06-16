@@ -2,11 +2,15 @@
  * Netlify Function — check-payment-status.js
  *
  * Called when the user returns to the app after a UPI payment
- * (e.g. after GPay closes). Checks Razorpay to see if the
- * payment for a given order was completed, and if so, writes
- * paidUntil to Firestore just like verify-payment.js does.
+ * (e.g. after GPay closes and they tap "Return to GuruBook").
+ * Checks Razorpay to see if the payment for a given order was
+ * completed, and if so, writes paidUntil to Firestore exactly
+ * like verify-payment.js does.
  *
- * Required env vars (same as verify-payment.js):
+ * FIX: Uses `phone` (not `deviceId`) to look up the user —
+ *      consistent with create-order.js and verify-payment.js.
+ *
+ * Required env vars:
  *   RAZORPAY_KEY_ID
  *   RAZORPAY_KEY_SECRET
  *   FIREBASE_PROJECT_ID
@@ -44,13 +48,13 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
+  // Accept `phone` — consistent with the rest of the payment system.
+  // `orderId` comes from the order created in create-order.js.
   const { orderId, phone } = body;
 
   if (!orderId || !phone) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'orderId and phone required' }) };
+    return { statusCode: 400, body: JSON.stringify({ error: 'orderId and phone are required' }) };
   }
-
-  const normalised = phone.replace(/\D/g, '').slice(-10);
 
   const razorpay = new Razorpay({
     key_id:     process.env.RAZORPAY_KEY_ID,
@@ -58,10 +62,8 @@ exports.handler = async (event) => {
   });
 
   try {
-    // Fetch all payments for this order from Razorpay
+    // ── 1. Fetch all payments for this order ─────────────────────────────────
     const payments = await razorpay.orders.fetchPayments(orderId);
-
-    // Find a captured (successful) payment
     const successfulPayment = payments.items?.find(p => p.status === 'captured');
 
     if (!successfulPayment) {
@@ -73,29 +75,62 @@ exports.handler = async (event) => {
       };
     }
 
-    // Determine plan from order notes
+    // ── 2. Determine plan from order notes ───────────────────────────────────
     const order    = await razorpay.orders.fetch(orderId);
     const plan     = order.notes?.plan || 'monthly';
     const duration = PLAN_DURATION_MS[plan] || PLAN_DURATION_MS.monthly;
 
-    const now       = new Date();
-    const paidUntil = new Date(now.getTime() + duration);
+    // ── 3. Look up user in Firestore by phone ────────────────────────────────
+    const db         = admin.firestore();
+    const normalised = phone.replace(/\D/g, '').slice(-10);
 
-    // Look up user by phone
-    const db = admin.firestore();
     let userDocRef = null;
+    try {
+      let snap = await db.collection('users')
+        .where('phoneNumber', '==', normalised)
+        .limit(1).get();
 
-    let snap = await db.collection('users')
-      .where('phoneNumber', '==', normalised).limit(1).get();
-    if (snap.empty) {
-      snap = await db.collection('users')
-        .where('phoneNumber', '==', '91' + normalised).limit(1).get();
+      if (snap.empty) {
+        snap = await db.collection('users')
+          .where('phoneNumber', '==', '91' + normalised)
+          .limit(1).get();
+      }
+
+      if (snap.empty) {
+        console.error('check-payment-status: user not found for phone:', normalised);
+        return {
+          statusCode: 404,
+          body: JSON.stringify({ error: 'User not found. Please open the GuruBook app first.' })
+        };
+      }
+
+      userDocRef = snap.docs[0].ref;
+    } catch (err) {
+      console.error('check-payment-status: Firestore lookup error:', err);
+      return { statusCode: 500, body: JSON.stringify({ error: 'Database lookup failed' }) };
     }
-    if (snap.empty) {
-      return { statusCode: 200, headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paid: false, error: 'User not found' }) };
+
+    // ── 4. Idempotency: skip if already processed ────────────────────────────
+    const userDoc  = await userDocRef.get();
+    const userData = userDoc.data() || {};
+
+    if (userData.lastPaymentId === successfulPayment.id) {
+      console.log(`check-payment-status: Payment ${successfulPayment.id} already processed — returning success`);
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paid:      true,
+          paidUntil: userData.paidUntil?.toDate().toISOString()
+        })
+      };
     }
-    userDocRef = snap.docs[0].ref;
+
+    // ── 5. Activate: extend from current expiry, not today ───────────────────
+    const now              = new Date();
+    const currentPaidUntil = userData.paidUntil?.toDate();
+    const baseDate         = (currentPaidUntil && currentPaidUntil > now) ? currentPaidUntil : now;
+    const paidUntil        = new Date(baseDate.getTime() + duration);
 
     await userDocRef.update({
       paidUntil:       admin.firestore.Timestamp.fromDate(paidUntil),
@@ -105,7 +140,7 @@ exports.handler = async (event) => {
       lastPaymentAt:   admin.firestore.FieldValue.serverTimestamp()
     });
 
-    console.log(`UPI return: Activated ${plan} for ${normalised} until ${paidUntil.toISOString()}`);
+    console.log(`check-payment-status: Activated ${plan} for ${normalised} until ${paidUntil.toISOString()}`);
 
     return {
       statusCode: 200,
