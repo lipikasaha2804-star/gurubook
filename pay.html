@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuruBook — Subscribe</title>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px 16px;
+  }
+  .card {
+    background: rgba(255,255,255,0.07);
+    border: 1.5px solid rgba(255,255,255,0.13);
+    border-radius: 28px;
+    padding: 36px 28px;
+    width: 100%; max-width: 420px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  }
+  .logo { font-size: 42px; text-align: center; margin-bottom: 8px; }
+  .brand { font-size: 26px; font-weight: 900; color: #fff; text-align: center; letter-spacing: -0.5px; margin-bottom: 4px; }
+  .tagline { font-size: 13px; color: rgba(255,255,255,0.45); text-align: center; margin-bottom: 28px; }
+
+  /* Plan tiles */
+  .plan-tile {
+    border: 2px solid rgba(255,255,255,0.14);
+    border-radius: 18px; padding: 16px 18px; cursor: pointer;
+    transition: border-color 0.18s, background 0.18s;
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 12px; position: relative;
+    user-select: none;
+  }
+  .plan-tile.selected {
+    border-color: #6366f1;
+    background: rgba(99,102,241,0.12);
+  }
+  .plan-radio {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    flex-shrink: 0; transition: all 0.18s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .plan-tile.selected .plan-radio {
+    border-color: #6366f1; background: #6366f1;
+  }
+  .plan-radio-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #fff; display: none;
+  }
+  .plan-tile.selected .plan-radio-dot { display: block; }
+  .plan-label { font-size: 15px; font-weight: 800; color: #fff; }
+  .plan-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+  .plan-price { margin-left: auto; text-align: right; flex-shrink: 0; }
+  .plan-amount { font-size: 22px; font-weight: 900; color: #fff; }
+  .plan-period { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+  .badge {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    color: #fff; font-size: 10px; font-weight: 800;
+    padding: 3px 12px; border-radius: 999px; white-space: nowrap;
+  }
+
+  /* Pay button */
+  .pay-btn {
+    width: 100%; padding: 16px; margin-top: 4px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; border: none; border-radius: 16px;
+    font-size: 16px; font-weight: 800; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 8px 30px rgba(99,102,241,0.45);
+    transition: opacity 0.15s, transform 0.1s;
+    font-family: inherit;
+  }
+  .pay-btn:active { opacity: 0.85; transform: scale(0.98); }
+  .pay-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  /* Trust row */
+  .trust-row {
+    display: flex; justify-content: center; align-items: center;
+    gap: 16px; margin-top: 16px; margin-bottom: 6px;
+  }
+  .trust-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: rgba(255,255,255,0.35); }
+  .trust-divider { width: 1px; height: 12px; background: rgba(255,255,255,0.1); }
+  .methods { text-align: center; font-size: 11px; color: rgba(255,255,255,0.2); margin-bottom: 20px; }
+
+  /* Feature list */
+  .features { margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
+  .feature { display: flex; align-items: center; gap: 10px; font-size: 13px; color: rgba(255,255,255,0.65); }
+  .feature-dot { width: 20px; height: 20px; border-radius: 50%; background: rgba(99,102,241,0.25); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+
+  /* States */
+  .state { display: none; text-align: center; }
+  .state.active { display: block; }
+  .state-icon { font-size: 56px; margin-bottom: 16px; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .pulse { animation: pulse 1.2s ease-in-out infinite; }
+  .state-title { font-size: 22px; font-weight: 900; color: #fff; margin-bottom: 10px; }
+  .state-msg { font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.7; }
+  .return-btn {
+    margin-top: 24px; width: 100%; padding: 15px;
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    color: #fff; border: none; border-radius: 16px;
+    font-size: 15px; font-weight: 800; cursor: pointer;
+    font-family: inherit; display: flex; align-items: center;
+    justify-content: center; gap: 8px;
+  }
+  .error-btn {
+    margin-top: 12px; width: 100%; padding: 14px;
+    background: rgba(255,255,255,0.09); border: 1.5px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.7); border-radius: 14px;
+    font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  #error-ref { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- ── SELECT PLAN STATE ── -->
+  <div id="state-select" class="state active">
+    <div class="logo">📚</div>
+    <div class="brand">GuruBook</div>
+    <div class="tagline">Fee & Student Management for Teachers</div>
+
+    <!-- Features -->
+    <div class="features">
+      <div class="feature"><div class="feature-dot">✓</div>Unlimited students &amp; batches</div>
+      <div class="feature"><div class="feature-dot">✓</div>WhatsApp fee reminders</div>
+      <div class="feature"><div class="feature-dot">✓</div>Monthly fee reports &amp; PDF</div>
+      <div class="feature"><div class="feature-dot">✓</div>AI assistant for teachers</div>
+      <div class="feature"><div class="feature-dot">✓</div>All your data stays safe</div>
+    </div>
+
+    <!-- Monthly plan -->
+    <div class="plan-tile" id="tile-monthly" onclick="selectPlan('monthly')">
+      <div class="plan-radio"><div class="plan-radio-dot"></div></div>
+      <div>
+        <div class="plan-label">Monthly</div>
+        <div class="plan-sub">Billed every month · cancel anytime</div>
+      </div>
+      <div class="plan-price">
+        <div class="plan-amount">₹349</div>
+        <div class="plan-period">/month</div>
+      </div>
+    </div>
+
+    <!-- Yearly plan -->
+    <div class="plan-tile selected" id="tile-yearly" onclick="selectPlan('yearly')">
+      <div class="badge">🏷 BEST VALUE — SAVE 52%</div>
+      <div class="plan-radio"><div class="plan-radio-dot"></div></div>
+      <div>
+        <div class="plan-label">Yearly</div>
+        <div class="plan-sub">Just ₹165/month · best deal</div>
+      </div>
+      <div class="plan-price">
+        <div class="plan-amount">₹1,980</div>
+        <div class="plan-period">/year</div>
+      </div>
+    </div>
+
+    <button class="pay-btn" id="pay-btn" onclick="startPayment()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      <span id="pay-btn-text">Pay ₹1,980 / year</span>
+    </button>
+
+    <div class="trust-row">
+      <div class="trust-item">🔒 Secure</div>
+      <div class="trust-divider"></div>
+      <div class="trust-item">⚡ Instant activation</div>
+      <div class="trust-divider"></div>
+      <div class="trust-item">🏆 Razorpay</div>
+    </div>
+    <div class="methods">UPI · Cards · Net Banking · Wallets</div>
+  </div>
+
+  <!-- ── PROCESSING STATE ── -->
+  <div id="state-processing" class="state">
+    <div class="state-icon pulse">⚡</div>
+    <div class="state-title">Activating Your App…</div>
+    <div class="state-msg">Payment confirmed! 🎉<br>Updating your access — just a moment.</div>
+  </div>
+
+  <!-- ── SUCCESS STATE ── -->
+  <div id="state-success" class="state">
+    <div class="state-icon">🎉</div>
+    <div class="state-title">You're All Set!</div>
+    <div class="state-msg">
+      Your GuruBook subscription is now <strong style="color:#a5b4fc;">active</strong>.<br><br>
+      Return to the app — it will unlock automatically. If it doesn't, tap the button below.
+    </div>
+    <button class="return-btn" onclick="returnToApp()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+      Return to GuruBook App
+    </button>
+  </div>
+
+  <!-- ── ERROR STATE ── -->
+  <div id="state-error" class="state">
+    <div class="state-icon">⚠️</div>
+    <div class="state-title">Activation Issue</div>
+    <div class="state-msg" id="error-msg">
+      Your payment was received but we could not activate your app automatically. Please contact support — we will fix it immediately.
+    </div>
+    <div id="error-ref"></div>
+    <button class="error-btn" onclick="showState('state-select')">← Try Again</button>
+    <button class="return-btn" onclick="contactSupport()" style="margin-top:10px;">
+      💬 Contact Support on WhatsApp
+    </button>
+  </div>
+
+</div>
+
+<script>
+// ── Read URL params ───────────────────────────────────────────────────────────
+const params  = new URLSearchParams(window.location.search);
+const phone   = params.get('phone') || '';
+const source  = params.get('source') || 'web';
+let   plan    = params.get('plan')  || 'yearly';
+
+// ── Init plan selection ───────────────────────────────────────────────────────
+if (plan === 'monthly') selectPlan('monthly');
+
+function selectPlan(p) {
+  plan = p;
+  document.getElementById('tile-monthly').classList.toggle('selected', p === 'monthly');
+  document.getElementById('tile-yearly').classList.toggle('selected',  p === 'yearly');
+  document.getElementById('pay-btn-text').textContent =
+    p === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
+}
+
+function showState(id) {
+  ['state-select','state-processing','state-success','state-error'].forEach(s => {
+    document.getElementById(s).classList.toggle('active', s === id);
+  });
+}
+
+// ── Payment flow ──────────────────────────────────────────────────────────────
+async function startPayment() {
+  const btn     = document.getElementById('pay-btn');
+  const btnText = document.getElementById('pay-btn-text');
+  btn.disabled  = true;
+  btnText.textContent = 'Opening payment…';
+
+  try {
+    // 1. Create order on server
+    const res = await fetch('/.netlify/functions/create-order', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ plan, phone })
+    });
+    if (!res.ok) throw new Error('Order creation failed');
+    const order = await res.json();
+    if (!order.orderId) throw new Error('No orderId');
+
+    btn.disabled = false;
+    btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
+
+    // 2. Open Razorpay checkout
+    const rzp = new window.Razorpay({
+      key:      order.keyId,
+      amount:   order.amount,
+      currency: 'INR',
+      name:     'GuruBook',
+      description: plan === 'yearly' ? 'Yearly Plan — ₹1,980/year' : 'Monthly Plan — ₹349/month',
+      order_id: order.orderId,
+      prefill:  { contact: phone },
+      readonly: { contact: true },
+      theme:    { color: '#6366f1' },
+      config: {
+        display: {
+          preferences: { show_default_blocks: true }
+        }
+      },
+      modal: {
+        ondismiss: () => {
+          btn.disabled = false;
+          btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
+        }
+      },
+      handler: async function(response) {
+        // 3. Verify payment on server
+        showState('state-processing');
+        try {
+          const vRes = await fetch('/.netlify/functions/verify-payment', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+              phone,
+              plan
+            })
+          });
+          const vData = await vRes.json();
+          if (vData.success) {
+            showState('state-success');
+          } else {
+            throw new Error(vData.error || 'Verification failed');
+          }
+        } catch(e) {
+          document.getElementById('error-msg').textContent =
+            'Payment was received but activation failed. Please contact support — we will fix it immediately.';
+          document.getElementById('error-ref').textContent =
+            'Ref: ' + (response.razorpay_payment_id || 'N/A');
+          showState('state-error');
+        }
+      }
+    });
+
+    rzp.on('payment.failed', () => {
+      btn.disabled = false;
+      btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
+    });
+
+    rzp.open();
+
+  } catch(e) {
+    btn.disabled = false;
+    btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
+    alert('Could not start payment. Please check your connection and try again.');
+  }
+}
+
+// ── Return to app ─────────────────────────────────────────────────────────────
+function returnToApp() {
+  // Try the custom URL scheme first (if Median has it configured)
+  window.location.href = 'gurubook://unlock';
+  // Fallback after 1s: just tell the user to switch back
+  setTimeout(() => {
+    alert('Please switch back to the GuruBook app — it should be unlocked now!');
+  }, 1000);
+}
+
+function contactSupport() {
+  const msg = encodeURIComponent(
+    'Hi, my payment was confirmed but GuruBook did not unlock.\nPhone: ' + phone + '\nPlan: ' + plan
+  );
+  window.open('https://wa.me/918787543274?text=' + msg, '_blank');
+}
+</script>
+</body>
+</html>
