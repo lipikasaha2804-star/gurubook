@@ -192,8 +192,7 @@
     <div class="state-title">You're All Set!</div>
     <div class="state-msg">
       Your GuruBook subscription is now <strong style="color:#a5b4fc;">active</strong>.<br><br>
-      Returning you to the app automatically…<br>
-      <span style="font-size:12px;opacity:0.5;">(or tap below if it doesn't happen)</span>
+      Return to the app — it will unlock automatically. If it doesn't, tap the button below.
     </div>
     <button class="return-btn" onclick="returnToApp()">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -262,6 +261,13 @@ async function startPayment() {
     btn.disabled = false;
     btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
 
+    // Save order to sessionStorage so we can recover if Chrome reloads after UPI return
+    sessionStorage.setItem('gb_pending_order', JSON.stringify({
+      orderId: order.orderId,
+      phone,
+      plan
+    }));
+
     // 2. Open Razorpay checkout
     const rzp = new window.Razorpay({
       key:      order.keyId,
@@ -301,6 +307,7 @@ async function startPayment() {
           });
           const vData = await vRes.json();
           if (vData.success) {
+            sessionStorage.removeItem('gb_pending_order');
             showState('state-success');
             setTimeout(returnToApp, 3000);
           } else {
@@ -335,6 +342,44 @@ function returnToApp() {
   try { window.close(); } catch(e) {}
   setTimeout(() => { try { history.back(); } catch(e) {} }, 400);
 }
+
+// ── Recovery: runs on every page load ────────────────────────────────────────
+// When Chrome reloads after UPI return, the Razorpay handler never fires.
+// We detect this by checking sessionStorage for a pending order and polling
+// check-payment-status to see if it was captured.
+async function _recoverAfterUPIReturn() {
+  const raw = sessionStorage.getItem('gb_pending_order');
+  if (!raw) return;
+  let pending;
+  try { pending = JSON.parse(raw); } catch { return; }
+  if (!pending.orderId || !pending.phone) return;
+
+  // Show processing state immediately — payment likely already done
+  showState('state-processing');
+
+  try {
+    const res = await fetch('/.netlify/functions/check-payment-status', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ orderId: pending.orderId, phone: pending.phone })
+    });
+    const data = await res.json();
+    if (data.paid) {
+      sessionStorage.removeItem('gb_pending_order');
+      showState('state-success');
+      setTimeout(returnToApp, 3000);
+    } else {
+      // Payment not captured yet — go back to select so user can retry
+      sessionStorage.removeItem('gb_pending_order');
+      showState('state-select');
+    }
+  } catch(e) {
+    sessionStorage.removeItem('gb_pending_order');
+    showState('state-select');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', _recoverAfterUPIReturn);
 
 function contactSupport() {
   const msg = encodeURIComponent(
