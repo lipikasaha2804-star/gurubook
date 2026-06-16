@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GuruBook — Subscribe</title>
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body {
@@ -27,7 +26,6 @@
   .brand { font-size: 26px; font-weight: 900; color: #fff; text-align: center; letter-spacing: -0.5px; margin-bottom: 4px; }
   .tagline { font-size: 13px; color: rgba(255,255,255,0.45); text-align: center; margin-bottom: 28px; }
 
-  /* Plan tiles */
   .plan-tile {
     border: 2px solid rgba(255,255,255,0.14);
     border-radius: 18px; padding: 16px 18px; cursor: pointer;
@@ -36,23 +34,15 @@
     margin-bottom: 12px; position: relative;
     user-select: none;
   }
-  .plan-tile.selected {
-    border-color: #6366f1;
-    background: rgba(99,102,241,0.12);
-  }
+  .plan-tile.selected { border-color: #6366f1; background: rgba(99,102,241,0.12); }
   .plan-radio {
     width: 20px; height: 20px; border-radius: 50%;
     border: 2px solid rgba(255,255,255,0.3);
     flex-shrink: 0; transition: all 0.18s;
     display: flex; align-items: center; justify-content: center;
   }
-  .plan-tile.selected .plan-radio {
-    border-color: #6366f1; background: #6366f1;
-  }
-  .plan-radio-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #fff; display: none;
-  }
+  .plan-tile.selected .plan-radio { border-color: #6366f1; background: #6366f1; }
+  .plan-radio-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; display: none; }
   .plan-tile.selected .plan-radio-dot { display: block; }
   .plan-label { font-size: 15px; font-weight: 800; color: #fff; }
   .plan-sub { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
@@ -65,8 +55,6 @@
     color: #fff; font-size: 10px; font-weight: 800;
     padding: 3px 12px; border-radius: 999px; white-space: nowrap;
   }
-
-  /* Pay button */
   .pay-btn {
     width: 100%; padding: 16px; margin-top: 4px;
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
@@ -79,8 +67,6 @@
   }
   .pay-btn:active { opacity: 0.85; transform: scale(0.98); }
   .pay-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-  /* Trust row */
   .trust-row {
     display: flex; justify-content: center; align-items: center;
     gap: 16px; margin-top: 16px; margin-bottom: 6px;
@@ -88,8 +74,6 @@
   .trust-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: rgba(255,255,255,0.35); }
   .trust-divider { width: 1px; height: 12px; background: rgba(255,255,255,0.1); }
   .methods { text-align: center; font-size: 11px; color: rgba(255,255,255,0.2); margin-bottom: 20px; }
-
-  /* Feature list */
   .features { margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
   .feature { display: flex; align-items: center; gap: 10px; font-size: 13px; color: rgba(255,255,255,0.65); }
   .feature-dot { width: 20px; height: 20px; border-radius: 50%; background: rgba(99,102,241,0.25); display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
@@ -109,7 +93,6 @@
     font-size: 15px; font-weight: 800; cursor: pointer;
     font-family: inherit; display: flex; align-items: center;
     justify-content: center; gap: 8px;
-    text-decoration: none;
   }
   .whatsapp-btn {
     margin-top: 10px; width: 100%; padding: 14px;
@@ -126,6 +109,9 @@
     font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
   }
   #error-ref { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 8px; }
+
+  /* Hidden Razorpay redirect form */
+  #rzp-form { display: none; }
 </style>
 </head>
 <body>
@@ -137,7 +123,6 @@
     <div class="brand">GuruBook</div>
     <div class="tagline">Fee &amp; Student Management for Teachers</div>
 
-    <!-- Features -->
     <div class="features">
       <div class="feature"><div class="feature-dot">✓</div>Unlimited students &amp; batches</div>
       <div class="feature"><div class="feature-dot">✓</div>WhatsApp fee reminders</div>
@@ -146,7 +131,6 @@
       <div class="feature"><div class="feature-dot">✓</div>All your data stays safe</div>
     </div>
 
-    <!-- Monthly plan -->
     <div class="plan-tile" id="tile-monthly" onclick="selectPlan('monthly')">
       <div class="plan-radio"><div class="plan-radio-dot"></div></div>
       <div>
@@ -159,7 +143,6 @@
       </div>
     </div>
 
-    <!-- Yearly plan -->
     <div class="plan-tile selected" id="tile-yearly" onclick="selectPlan('yearly')">
       <div class="badge">🏷 BEST VALUE — SAVE 52%</div>
       <div class="plan-radio"><div class="plan-radio-dot"></div></div>
@@ -191,8 +174,8 @@
   <!-- ── PROCESSING STATE ── -->
   <div id="state-processing" class="state">
     <div class="state-icon pulse">⚡</div>
-    <div class="state-title">Activating Your App…</div>
-    <div class="state-msg">Payment confirmed! 🎉<br>Updating your access — just a moment.</div>
+    <div class="state-title">Creating your order…</div>
+    <div class="state-msg">Just a moment while we prepare the payment page.</div>
   </div>
 
   <!-- ── SUCCESS STATE ── -->
@@ -201,10 +184,9 @@
     <div class="state-title">You're All Set!</div>
     <div class="state-msg">
       Your GuruBook subscription is now <strong style="color:#a5b4fc;">active</strong>.<br><br>
-      Tap the button below to return to the app.<br>
+      Tap below to return to the app.<br>
       <span style="font-size:12px;opacity:0.5;">(your subscription is already unlocked)</span>
     </div>
-    <!-- Deep link button — opens gurubook:// which Median intercepts and brings app to foreground -->
     <button class="return-btn" onclick="returnToApp()">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
       Return to GuruBook App
@@ -216,7 +198,7 @@
     <div class="state-icon">⚠️</div>
     <div class="state-title">Activation Issue</div>
     <div class="state-msg" id="error-msg">
-      Your payment was received but we could not activate your app automatically. Please contact support — we will fix it immediately.
+      Your payment was received but we could not activate your app automatically. Please contact support.
     </div>
     <div id="error-ref"></div>
     <button class="error-btn" onclick="showState('state-select')">← Try Again</button>
@@ -227,20 +209,61 @@
 
 </div>
 
+<!--
+  RAZORPAY REDIRECT FORM
+  ──────────────────────
+  Instead of using the JS modal (which gets trapped in the in-app browser),
+  we POST directly to Razorpay's hosted checkout URL.
+  Razorpay will open fully in Chrome with ALL payment options including UPI.
+  After payment, Razorpay redirects back to our callback_url below.
+-->
+<form id="rzp-form" method="POST" action="https://api.razorpay.com/v1/checkout/embedded">
+  <input type="hidden" name="key_id"       id="f-key-id">
+  <input type="hidden" name="order_id"     id="f-order-id">
+  <input type="hidden" name="name"         value="GuruBook">
+  <input type="hidden" name="description"  id="f-description">
+  <input type="hidden" name="prefill[contact]" id="f-contact">
+  <input type="hidden" name="theme[color]" value="#6366f1">
+  <!--
+    callback_url: Razorpay POSTs payment result here after success.
+    This page runs verify-payment server-side and redirects to pay.html?status=success
+    so the user sees the success screen.
+    cancel_url:   Where to send the user if they press Back on Razorpay's page.
+  -->
+  <input type="hidden" name="callback_url" id="f-callback">
+  <input type="hidden" name="cancel_url"   id="f-cancel">
+</form>
+
 <script>
-// ── Read URL params ───────────────────────────────────────────────────────────
-const params  = new URLSearchParams(window.location.search);
-const phone   = params.get('phone')  || '';
-const source  = params.get('source') || 'web';
-let   plan    = params.get('plan')   || 'yearly';
+// ── URL params ────────────────────────────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const phone  = params.get('phone')  || '';
+let   plan   = params.get('plan')   || 'yearly';
 
-// ── Deep link scheme for your Median app ─────────────────────────────────────
-// This is the custom URL scheme registered in your Median (GoNative) app config.
-// When opened from Chrome, Android/iOS will switch focus back to GuruBook.
-// Make sure this matches the scheme in your Median dashboard → App Settings → Deep Links.
-const APP_DEEP_LINK = 'gurubook://payment-success';
+// The base URL of this page — used to build callback & cancel URLs
+const BASE   = window.location.origin;
+// Deep link to bring the user back into the GuruBook app from Chrome
+// ⚠️  Check your Median dashboard → App Settings → URL Scheme
+//     and replace "gurubook" if yours is different.
+const APP_SCHEME = 'gurubook';
 
-// ── Init plan selection ───────────────────────────────────────────────────────
+// ── Handle return from Razorpay (after payment or cancel) ────────────────────
+// When Razorpay redirects back here, it will add ?status=success or we handle
+// it via the callback endpoint. Check for ?paid=1 which our callback sets.
+const status = params.get('status');
+if (status === 'success') {
+  showState('state-success');
+  // Auto deep-link after 2s
+  setTimeout(returnToApp, 2000);
+} else if (status === 'failed') {
+  document.getElementById('error-msg').textContent =
+    'Payment was not completed. Please try again.';
+  showState('state-error');
+}
+
+// ── Plan selection ────────────────────────────────────────────────────────────
+// Always init the correct tile. selectPlan('yearly') is default via HTML class,
+// only need to call explicitly for monthly.
 if (plan === 'monthly') selectPlan('monthly');
 
 function selectPlan(p) {
@@ -257,15 +280,18 @@ function showState(id) {
   });
 }
 
-// ── Payment flow ──────────────────────────────────────────────────────────────
+// ── Payment flow — REDIRECT MODE (no JS modal) ────────────────────────────────
+// We POST a form to Razorpay's hosted page. This opens the full Razorpay UI
+// directly in Chrome — not a modal — so UPI, GPay, PhonePe etc. all work.
 async function startPayment() {
   const btn     = document.getElementById('pay-btn');
   const btnText = document.getElementById('pay-btn-text');
   btn.disabled  = true;
-  btnText.textContent = 'Opening payment…';
+  btnText.textContent = 'Preparing payment…';
+  showState('state-processing');
 
   try {
-    // 1. Create order on server
+    // 1. Create Razorpay order on our server
     const res = await fetch('/.netlify/functions/create-order', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -273,71 +299,27 @@ async function startPayment() {
     });
     if (!res.ok) throw new Error('Order creation failed');
     const order = await res.json();
-    if (!order.orderId) throw new Error('No orderId');
+    if (!order.orderId) throw new Error('No orderId in response');
 
-    btn.disabled = false;
-    btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
+    // 2. Build callback URL — Razorpay will POST the result here.
+    //    Our Netlify function verifies + activates, then redirects to pay.html?status=success
+    const callbackUrl = `${BASE}/.netlify/functions/razorpay-callback?phone=${encodeURIComponent(phone)}&plan=${encodeURIComponent(plan)}`;
+    const cancelUrl   = `${BASE}/pay.html?phone=${encodeURIComponent(phone)}&plan=${encodeURIComponent(plan)}&status=failed`;
 
-    // 2. Open Razorpay checkout
-    //    Running in external Chrome — UPI deep links (GPay, PhonePe, etc.) work correctly here.
-    const rzp = new window.Razorpay({
-      key:         order.keyId,
-      amount:      order.amount,
-      currency:    'INR',
-      name:        'GuruBook',
-      description: plan === 'yearly' ? 'Yearly Plan — ₹1,980/year' : 'Monthly Plan — ₹349/month',
-      order_id:    order.orderId,
-      prefill:     { contact: phone },
-      readonly:    { contact: true },
-      theme:       { color: '#6366f1' },
-      modal: {
-        ondismiss: () => {
-          btn.disabled = false;
-          btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
-        }
-      },
-      handler: async function(response) {
-        // 3. Verify payment on server
-        showState('state-processing');
-        try {
-          const vRes = await fetch('/.netlify/functions/verify-payment', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_order_id:   response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature:  response.razorpay_signature,
-              phone,
-              plan
-            })
-          });
-          const vData = await vRes.json();
-          if (vData.success) {
-            showState('state-success');
-            // Auto-attempt deep link after 2s. The Firestore onSnapshot in the app
-            // will have already unlocked the subscription by the time user returns.
-            setTimeout(returnToApp, 2000);
-          } else {
-            throw new Error(vData.error || 'Verification failed');
-          }
-        } catch(e) {
-          document.getElementById('error-msg').textContent =
-            'Payment was received but activation failed. Please contact support — we will fix it immediately.';
-          document.getElementById('error-ref').textContent =
-            'Ref: ' + (response.razorpay_payment_id || 'N/A');
-          showState('state-error');
-        }
-      }
-    });
+    // 3. Fill the hidden form and submit — Chrome navigates to Razorpay's hosted page
+    document.getElementById('f-key-id').value      = order.keyId;
+    document.getElementById('f-order-id').value    = order.orderId;
+    document.getElementById('f-description').value = plan === 'yearly'
+      ? 'Yearly Plan — ₹1,980/year' : 'Monthly Plan — ₹349/month';
+    document.getElementById('f-contact').value     = phone;
+    document.getElementById('f-callback').value    = callbackUrl;
+    document.getElementById('f-cancel').value      = cancelUrl;
 
-    rzp.on('payment.failed', () => {
-      btn.disabled = false;
-      btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
-    });
-
-    rzp.open();
+    document.getElementById('rzp-form').submit();
 
   } catch(e) {
+    console.error(e);
+    showState('state-select');
     btn.disabled = false;
     btnText.textContent = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
     alert('Could not start payment. Please check your connection and try again.');
@@ -345,12 +327,8 @@ async function startPayment() {
 }
 
 // ── Return to app via deep link ───────────────────────────────────────────────
-// Since pay.html opens in EXTERNAL Chrome (not Median's in-app browser),
-// window.close() / history.back() won't work. Instead we navigate to the
-// app's custom URL scheme, which Android/iOS intercepts and brings GuruBook
-// back to the foreground.
 function returnToApp() {
-  window.location.href = APP_DEEP_LINK;
+  window.location.href = APP_SCHEME + '://payment-success';
 }
 
 function contactSupport() {
