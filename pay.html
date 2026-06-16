@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GuruBook — Subscribe</title>
+<!--
+  RAZORPAY JS CHECKOUT — NO FORM POST.
+  The Razorpay Standard Checkout modal (animated popup) is used exclusively.
+  This page must always open in external Chrome (configured via Median Link Handling).
+  UPI requires: external browser + prefill.email + explicit UPI method config below.
+-->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box; margin: 0; padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px 16px;
+  }
+  .card {
+    background: rgba(255,255,255,0.07);
+    border: 1.5px solid rgba(255,255,255,0.13);
+    border-radius: 28px;
+    padding: 36px 28px;
+    width: 100%; max-width: 420px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  }
+
+  /* ── Branding ── */
+  .logo   { font-size: 42px; text-align: center; margin-bottom: 8px; }
+  .brand  { font-size: 26px; font-weight: 900; color: #fff; text-align: center; letter-spacing: -0.5px; margin-bottom: 4px; }
+  .tagline{ font-size: 13px; color: rgba(255,255,255,0.45); text-align: center; margin-bottom: 28px; }
+
+  /* ── Plan tiles ── */
+  .plan-tile {
+    border: 2px solid rgba(255,255,255,0.14);
+    border-radius: 18px; padding: 16px 18px; cursor: pointer;
+    transition: border-color 0.18s, background 0.18s;
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 12px; position: relative;
+    user-select: none;
+  }
+  .plan-tile.selected {
+    border-color: #6366f1;
+    background: rgba(99,102,241,0.12);
+  }
+  .plan-radio {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    flex-shrink: 0; transition: all 0.18s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .plan-tile.selected .plan-radio { border-color: #6366f1; background: #6366f1; }
+  .plan-radio-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #fff; display: none;
+  }
+  .plan-tile.selected .plan-radio-dot { display: block; }
+  .plan-label  { font-size: 15px; font-weight: 800; color: #fff; }
+  .plan-sub    { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+  .plan-price  { margin-left: auto; text-align: right; flex-shrink: 0; }
+  .plan-amount { font-size: 22px; font-weight: 900; color: #fff; }
+  .plan-period { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+  .badge {
+    position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    color: #fff; font-size: 10px; font-weight: 800;
+    padding: 3px 12px; border-radius: 999px; white-space: nowrap;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Pay button ── */
+  .pay-btn {
+    width: 100%; padding: 16px; margin-top: 4px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; border: none; border-radius: 16px;
+    font-size: 16px; font-weight: 800; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 8px 30px rgba(99,102,241,0.45);
+    transition: opacity 0.15s, transform 0.1s;
+    font-family: inherit;
+  }
+  .pay-btn:active   { opacity: 0.85; transform: scale(0.98); }
+  .pay-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+  /* ── Trust row ── */
+  .trust-row {
+    display: flex; justify-content: center; align-items: center;
+    gap: 16px; margin-top: 16px; margin-bottom: 6px;
+  }
+  .trust-item    { display: flex; align-items: center; gap: 4px; font-size: 11px; color: rgba(255,255,255,0.35); }
+  .trust-divider { width: 1px; height: 12px; background: rgba(255,255,255,0.1); }
+  .methods       { text-align: center; font-size: 11px; color: rgba(255,255,255,0.2); margin-bottom: 20px; }
+
+  /* ── Feature list ── */
+  .features { margin-bottom: 24px; display: flex; flex-direction: column; gap: 8px; }
+  .feature   { display: flex; align-items: center; gap: 10px; font-size: 13px; color: rgba(255,255,255,0.65); }
+  .feature-dot {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(99,102,241,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; flex-shrink: 0;
+  }
+
+  /* ── Screen states ── */
+  .state         { display: none; text-align: center; }
+  .state.active  { display: block; }
+  .state-icon    { font-size: 56px; margin-bottom: 16px; }
+  .state-title   { font-size: 22px; font-weight: 900; color: #fff; margin-bottom: 10px; }
+  .state-msg     { font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.7; }
+
+  @keyframes spin   { to { transform: rotate(360deg); } }
+  @keyframes pulseO { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .pulse   { animation: pulseO 1.2s ease-in-out infinite; }
+  .spinner {
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 4px solid rgba(99,102,241,0.2);
+    border-top-color: #6366f1;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 20px;
+  }
+
+  /* ── Action buttons ── */
+  .return-btn {
+    margin-top: 24px; width: 100%; padding: 15px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; border: none; border-radius: 16px;
+    font-size: 15px; font-weight: 800; cursor: pointer;
+    font-family: inherit; display: flex; align-items: center;
+    justify-content: center; gap: 8px;
+    box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+  }
+  .whatsapp-btn {
+    margin-top: 12px; width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #25d366, #128c7e);
+    color: #fff; border: none; border-radius: 14px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: inherit; display: flex; align-items: center;
+    justify-content: center; gap: 8px;
+  }
+  .retry-btn {
+    margin-top: 12px; width: 100%; padding: 14px;
+    background: rgba(255,255,255,0.09);
+    border: 1.5px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.7); border-radius: 14px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: inherit;
+  }
+  #error-ref { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- ══════════════════════════════════════════
+       STATE 1: SELECT PLAN
+  ══════════════════════════════════════════ -->
+  <div id="state-select" class="state active">
+    <div class="logo">📚</div>
+    <div class="brand">GuruBook</div>
+    <div class="tagline">Fee &amp; Student Management for Teachers</div>
+
+    <div class="features">
+      <div class="feature"><div class="feature-dot">✓</div>Unlimited students &amp; batches</div>
+      <div class="feature"><div class="feature-dot">✓</div>WhatsApp fee reminders</div>
+      <div class="feature"><div class="feature-dot">✓</div>Monthly fee reports &amp; PDF</div>
+      <div class="feature"><div class="feature-dot">✓</div>AI assistant for teachers</div>
+      <div class="feature"><div class="feature-dot">✓</div>All your data stays safe</div>
+    </div>
+
+    <!-- Monthly -->
+    <div class="plan-tile" id="tile-monthly" onclick="selectPlan('monthly')">
+      <div class="plan-radio"><div class="plan-radio-dot"></div></div>
+      <div>
+        <div class="plan-label">Monthly</div>
+        <div class="plan-sub">Billed every month · cancel anytime</div>
+      </div>
+      <div class="plan-price">
+        <div class="plan-amount">₹349</div>
+        <div class="plan-period">/month</div>
+      </div>
+    </div>
+
+    <!-- Yearly (default selected) -->
+    <div class="plan-tile selected" id="tile-yearly" onclick="selectPlan('yearly')">
+      <div class="badge">🏷 BEST VALUE — SAVE 52%</div>
+      <div class="plan-radio"><div class="plan-radio-dot"></div></div>
+      <div>
+        <div class="plan-label">Yearly</div>
+        <div class="plan-sub">Just ₹165/month · best deal</div>
+      </div>
+      <div class="plan-price">
+        <div class="plan-amount">₹1,980</div>
+        <div class="plan-period">/year</div>
+      </div>
+    </div>
+
+    <button class="pay-btn" id="pay-btn" onclick="startPayment()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+      </svg>
+      <span id="pay-btn-text">Pay ₹1,980 / year</span>
+    </button>
+
+    <div class="trust-row">
+      <div class="trust-item">🔒 Secure</div>
+      <div class="trust-divider"></div>
+      <div class="trust-item">⚡ Instant activation</div>
+      <div class="trust-divider"></div>
+      <div class="trust-item">🏆 Razorpay</div>
+    </div>
+    <div class="methods">UPI · Cards · Net Banking · Wallets</div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       STATE 2: PROCESSING
+  ══════════════════════════════════════════ -->
+  <div id="state-processing" class="state">
+    <div class="spinner"></div>
+    <div class="state-title">Activating Your App…</div>
+    <div class="state-msg">
+      Payment confirmed! 🎉<br>
+      Updating your access — just a moment.
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       STATE 3: SUCCESS
+  ══════════════════════════════════════════ -->
+  <div id="state-success" class="state">
+    <div class="state-icon">🎉</div>
+    <div class="state-title">You're All Set!</div>
+    <div class="state-msg">
+      Your GuruBook subscription is now
+      <strong style="color:#a5b4fc;">active</strong>.<br><br>
+      Returning you to the app automatically…<br>
+      <span style="font-size:12px;opacity:0.5;">(or tap below if it doesn't happen)</span>
+    </div>
+    <button class="return-btn" onclick="returnToApp()">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      Return to GuruBook App
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       STATE 4: ERROR
+  ══════════════════════════════════════════ -->
+  <div id="state-error" class="state">
+    <div class="state-icon">⚠️</div>
+    <div class="state-title">Activation Issue</div>
+    <div class="state-msg" id="error-msg">
+      Your payment was received but we could not activate your app automatically.
+      Please contact support — we will fix it immediately.
+    </div>
+    <div id="error-ref"></div>
+    <button class="retry-btn" onclick="showState('state-select')">← Try Again</button>
+    <button class="whatsapp-btn" onclick="contactSupport()">
+      💬 Contact Support on WhatsApp
+    </button>
+  </div>
+
+</div><!-- /.card -->
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// URL params — phone and plan come from the GuruBook app deep link:
+//   pay.html?phone=9876543210&plan=yearly
+// ─────────────────────────────────────────────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const phone  = params.get('phone') || '';
+let   plan   = params.get('plan')  || 'yearly';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Initialise plan selection from URL param
+// ─────────────────────────────────────────────────────────────────────────────
+selectPlan(plan);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// On page load — check localStorage for a pending order.
+// Handles the case where the user left Chrome to pay in GPay and Chrome
+// was reloaded / refreshed while they were away.
+// ─────────────────────────────────────────────────────────────────────────────
+checkPendingOrder();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// visibilitychange — fires when the user returns to Chrome after tapping
+// "Return to browser" inside GPay / PhonePe / BHIM.
+// We wait 2 s then poll check-payment-status once.
+// ─────────────────────────────────────────────────────────────────────────────
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') {
+    setTimeout(checkPendingOrder, 2000);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+function selectPlan(p) {
+  plan = p;
+  document.getElementById('tile-monthly').classList.toggle('selected', p === 'monthly');
+  document.getElementById('tile-yearly').classList.toggle('selected',  p === 'yearly');
+  document.getElementById('pay-btn-text').textContent =
+    p === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
+}
+
+function showState(id) {
+  ['state-select', 'state-processing', 'state-success', 'state-error'].forEach(function (s) {
+    document.getElementById(s).classList.toggle('active', s === id);
+  });
+}
+
+function resetPayBtn() {
+  var btn  = document.getElementById('pay-btn');
+  var text = document.getElementById('pay-btn-text');
+  btn.disabled       = false;
+  text.textContent   = plan === 'monthly' ? 'Pay ₹349 / month' : 'Pay ₹1,980 / year';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// localStorage helpers for pending-order recovery
+// ─────────────────────────────────────────────────────────────────────────────
+var LS_ORDER = 'gb_pending_order_id';
+var LS_PHONE = 'gb_pending_phone';
+var LS_PLAN  = 'gb_pending_plan';
+
+function savePending(orderId) {
+  try {
+    localStorage.setItem(LS_ORDER, orderId);
+    localStorage.setItem(LS_PHONE, phone);
+    localStorage.setItem(LS_PLAN,  plan);
+  } catch (e) { /* ignore — private mode / storage full */ }
+}
+
+function clearPending() {
+  try {
+    localStorage.removeItem(LS_ORDER);
+    localStorage.removeItem(LS_PHONE);
+    localStorage.removeItem(LS_PLAN);
+  } catch (e) {}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// checkPendingOrder — silently polls the server.
+// Called on page load and on every visibilitychange → visible.
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkPendingOrder() {
+  var pendingOrderId, pendingPhone;
+  try {
+    pendingOrderId = localStorage.getItem(LS_ORDER);
+    pendingPhone   = localStorage.getItem(LS_PHONE);
+  } catch (e) { return; }
+
+  if (!pendingOrderId || !pendingPhone) return;
+
+  // Don't interrupt if we're already showing success or processing
+  var activeId = (document.querySelector('.state.active') || {}).id;
+  if (activeId === 'state-success' || activeId === 'state-processing') return;
+
+  try {
+    var res  = await fetch('/.netlify/functions/check-payment-status', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ orderId: pendingOrderId, phone: pendingPhone })
+    });
+    var data = await res.json();
+    if (data.paid) {
+      clearPending();
+      showState('state-success');
+      setTimeout(returnToApp, 3000);
+    }
+    // If not paid yet — leave the user on the current state silently
+  } catch (e) {
+    // Network error — silent fail, don't disrupt the user
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// startPayment — main payment flow
+// ─────────────────────────────────────────────────────────────────────────────
+async function startPayment() {
+  var btn  = document.getElementById('pay-btn');
+  var text = document.getElementById('pay-btn-text');
+  btn.disabled     = true;
+  text.textContent = 'Opening payment…';
+
+  // ── Step 1: Create Razorpay order via Netlify function ──────────────────
+  var order;
+  try {
+    var res = await fetch('/.netlify/functions/create-order', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ plan: plan, phone: phone })
+    });
+    if (!res.ok) throw new Error('create-order ' + res.status);
+    order = await res.json();
+    if (!order.orderId) throw new Error('No orderId in response');
+  } catch (e) {
+    resetPayBtn();
+    alert('Could not start payment. Please check your connection and try again.');
+    return;
+  }
+
+  // ── Step 2: Save pending order to localStorage (for GPay recovery) ───────
+  savePending(order.orderId);
+  resetPayBtn();
+
+  // ── Step 3: Open Razorpay Standard Checkout modal ────────────────────────
+  var planDescription = plan === 'yearly'
+    ? 'Yearly Plan — ₹1,980/year'
+    : 'Monthly Plan — ₹349/month';
+
+  var rzp = new window.Razorpay({
+    key:         order.keyId,
+    amount:      order.amount,
+    currency:    'INR',
+    name:        'GuruBook',
+    description: planDescription,
+    image:       'https://1gurubook.netlify.app/icon-192.png',
+    order_id:    order.orderId,
+
+    // prefill.email is MANDATORY for UPI — Razorpay hides UPI when email is empty
+    prefill: {
+      contact: phone,
+      email:   'pay@gurubook.in'
+    },
+
+    // Explicit UPI-first payment method config
+    // UPI flows: qr (desktop), intent (GPay/PhonePe deep link), collect (VPA), redirect
+    config: {
+      display: {
+        blocks: {
+          utib: {
+            name: 'Pay via UPI',
+            instruments: [
+              { method: 'upi', flows: ['qr', 'intent', 'collect', 'redirect'] }
+            ]
+          },
+          other: {
+            name: 'Other Payment Methods',
+            instruments: [
+              { method: 'card' },
+              { method: 'netbanking' },
+              { method: 'wallet' }
+            ]
+          }
+        },
+        sequence:    ['block.utib', 'block.other'],
+        preferences: { show_default_blocks: false }
+      }
+    },
+
+    theme: { color: '#6366f1' },
+
+    modal: {
+      ondismiss:     function () { resetPayBtn(); },
+      confirm_close: true,  // "Are you sure you want to close?" prompt
+      escape:        false  // prevent Esc key from closing modal accidentally
+    },
+
+    // ── Payment success handler ───────────────────────────────────────────
+    handler: async function (response) {
+      showState('state-processing');
+
+      try {
+        var vRes = await fetch('/.netlify/functions/verify-payment', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            razorpay_order_id:   response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature:  response.razorpay_signature,
+            phone: phone,
+            plan:  plan
+          })
+        });
+        var vData = await vRes.json();
+
+        if (vData.success) {
+          clearPending();               // clean up localStorage
+          showState('state-success');
+          setTimeout(returnToApp, 3000);
+        } else {
+          throw new Error(vData.error || 'Verification failed');
+        }
+      } catch (e) {
+        // Payment went through but verify-payment failed (network/DB error).
+        // Show the error screen with payment ID so support can activate manually.
+        // The Razorpay webhook (razorpay-webhook.js) will activate them automatically.
+        document.getElementById('error-msg').textContent =
+          'Payment was received but activation failed. Please contact support — we will fix it immediately.';
+        document.getElementById('error-ref').textContent =
+          'Ref: ' + (response.razorpay_payment_id || 'N/A');
+        showState('state-error');
+      }
+    }
+  });
+
+  // ── Payment failure handler ─────────────────────────────────────────────
+  rzp.on('payment.failed', function (response) {
+    resetPayBtn();
+    // Leave the user on the select-plan screen — they can try again
+  });
+
+  rzp.open();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// returnToApp — deep link back to the GuruBook native app.
+// 1. Try the custom URL scheme (works in Median / GoNative apps).
+// 2. Fallback: window.close() (closes Chrome Custom Tab / in-app browser).
+// 3. Final fallback: history.back().
+// ─────────────────────────────────────────────────────────────────────────────
+function returnToApp() {
+  try { window.location.href = 'gurubook://home'; } catch (e) {}
+  setTimeout(function () { try { window.close();    } catch (e) {} }, 500);
+  setTimeout(function () { try { history.back();    } catch (e) {} }, 1000);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// contactSupport — WhatsApp with pre-filled message
+// ─────────────────────────────────────────────────────────────────────────────
+function contactSupport() {
+  var msg = encodeURIComponent(
+    'Hi, my payment was confirmed but GuruBook did not unlock.\n' +
+    'Phone: ' + phone + '\nPlan: ' + plan
+  );
+  window.open('https://wa.me/918787543274?text=' + msg, '_blank');
+}
+</script>
+</body>
+</html>
