@@ -1,11 +1,9 @@
 /**
  * Netlify Function — create-order.js
+ * FIXED: now accepts `phone` (sent by pay.html) instead of `deviceId`
  *
- * Creates a Razorpay order server-side so the Key Secret never
- * reaches the browser. Called by _rzpStartPayment() in the app.
- *
- * Required env vars (set in Netlify → Site → Environment Variables):
- *   RAZORPAY_KEY_ID      = rzp_live_xxxxxxxxxxxx
+ * Required env vars:
+ *   RAZORPAY_KEY_ID      = rzp_test_xxxxxxxxxxxx  (or rzp_live_...)
  *   RAZORPAY_KEY_SECRET  = your_key_secret_here
  */
 
@@ -13,8 +11,8 @@ const Razorpay = require('razorpay');
 
 // Price map — amounts in paise (₹1 = 100 paise)
 const PLANS = {
-  monthly: { amount: 34900,  label: 'My Institute — Monthly Plan (₹349/month)' },
-  yearly:  { amount: 198000, label: 'My Institute — Yearly Plan (₹1,980/year)' }
+  monthly: { amount: 34900,  label: 'GuruBook — Monthly Plan (₹349/month)' },
+  yearly:  { amount: 198000, label: 'GuruBook — Yearly Plan (₹1,980/year)' }
 };
 
 exports.handler = async (event) => {
@@ -22,9 +20,9 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
-  let plan, deviceId;
+  let plan, phone;
   try {
-    ({ plan, deviceId } = JSON.parse(event.body));
+    ({ plan, phone } = JSON.parse(event.body));
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
   }
@@ -32,9 +30,11 @@ exports.handler = async (event) => {
   if (!PLANS[plan]) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid plan. Must be "monthly" or "yearly".' }) };
   }
-  if (!deviceId) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'deviceId is required' }) };
+  if (!phone) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'phone is required' }) };
   }
+
+  const normalised = phone.replace(/\D/g, '').slice(-10);
 
   const razorpay = new Razorpay({
     key_id:     process.env.RAZORPAY_KEY_ID,
@@ -45,9 +45,9 @@ exports.handler = async (event) => {
     const order = await razorpay.orders.create({
       amount:   PLANS[plan].amount,
       currency: 'INR',
-      receipt:  `mi_${plan}_${deviceId.slice(-8)}_${Date.now()}`,
+      receipt:  `gb_${plan}_${normalised.slice(-6)}_${Date.now()}`,
       notes: {
-        deviceId,
+        phone:       normalised,
         plan,
         description: PLANS[plan].label
       }
